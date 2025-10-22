@@ -1,29 +1,26 @@
 # syntax=docker/dockerfile:1
-
-# Basis-Image mit Node.js 18 (Debian statt Alpine, da Build-Tools benötigt werden)
-FROM node:18
-
-# Setze Umgebungsvariable auf Produktionsmodus
-ENV NODE_ENV=production
-
-# Arbeitsverzeichnis im Container
+# Comments are provided throughout this file to help you get started.
+# If you need more help, visit the Dockerfile reference guide at
+# https://docs.docker.com/go/dockerfile-reference/
+# Want to help us make this template better? Share your feedback here: https://forms.gle/ybq9Krt8jtBL3iCk7
+ARG NODE_VERSION=18
+FROM node:${NODE_VERSION}
+# Use production node environment by default.
+ENV NODE_ENV production
 WORKDIR /usr/src/app
-
-# Kopiere package-Dateien
-COPY package*.json ./
-
-# Installiere System-Abhängigkeiten (für native Module wie sqlite3)
-RUN apt-get update && apt-get install -y python3 make g++ \
-    && rm -rf /var/lib/apt/lists/*
-
-# Installiere Node.js-Abhängigkeiten
-RUN npm ci --omit=dev
-
-# Kopiere den Rest des Codes ins Image
+# Download dependencies as a separate step to take advantage of Docker's caching.
+# Leverage a cache mount to /root/.npm to speed up subsequent builds.
+# Leverage a bind mounts to package.json and package-lock.json to avoid having to copy them into
+# into this layer.
+RUN --mount=type=bind,source=package.json,target=package.json \
+    --mount=type=bind,source=package-lock.json,target=package-lock.json \
+    --mount=type=cache,target=/root/.npm \
+    npm ci --omit=dev
+# Run the application as a non-root user.
+USER node
+# Copy the rest of the source files into the image.
 COPY . .
-
-# Öffne Port 3000
+# Expose the port that the application listens on.
 EXPOSE 3000
-
-# Starte die Anwendung
-CMD ["node", "src/index.js"]
+# Run the application.
+CMD node src/index.js
